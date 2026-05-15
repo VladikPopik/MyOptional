@@ -2,7 +2,6 @@
 #include <stdexcept>
 #include <utility>
 
-// Исключение этого типа должно генерироватся при обращении к пустому optional
 class BadOptionalAccess : public std::exception {
 public:
   using exception::exception;
@@ -97,14 +96,11 @@ public:
 
   bool HasValue() const { return is_initialized_; };
 
-  // Операторы * и -> не должны делать никаких проверок на пустоту Optional.
-  // Эти проверки остаются на совести программиста
   T &operator*() { return *reinterpret_cast<T *>(data_); };
   const T &operator*() const { return *reinterpret_cast<const T *>(data_); };
   T *operator->() { return reinterpret_cast<T *>(data_); };
   const T *operator->() const { return reinterpret_cast<const T *>(data_); };
 
-  // Метод Value() генерирует исключение BadOptionalAccess, если Optional пуст
   T &Value() {
     if (!is_initialized_) {
       throw BadOptionalAccess();
@@ -125,8 +121,16 @@ public:
     }
   };
 
+  template <typename... Types> T &Emplace(Types &&...args) {
+    Reset();
+
+    new (data_) T(std::forward<Types>(args)...);
+
+    is_initialized_ = true;
+    return **this;
+  }
+
 private:
-  // alignas нужен для правильного выравнивания блока памяти
   alignas(T) char data_[sizeof(T)];
   bool is_initialized_ = false;
 };
