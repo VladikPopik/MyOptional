@@ -96,23 +96,27 @@ public:
 
   bool HasValue() const { return is_initialized_; };
 
-  T &operator*() { return *reinterpret_cast<T *>(data_); };
-  const T &operator*() const { return *reinterpret_cast<const T *>(data_); };
+  T &operator*() & { return *reinterpret_cast<T *>(data_); };
+  const T &operator*() const & { return *reinterpret_cast<const T *>(data_); };
   T *operator->() { return reinterpret_cast<T *>(data_); };
   const T *operator->() const { return reinterpret_cast<const T *>(data_); };
 
-  T &Value() {
+  T &Value() & {
     if (!is_initialized_) {
       throw BadOptionalAccess();
     }
     return **this;
   };
-  const T &Value() const {
+  const T &Value() const & {
     if (!is_initialized_) {
       throw BadOptionalAccess();
     }
     return **this;
   };
+
+  T &&operator*() && { return std::move(*reinterpret_cast<T *>(data_)); }
+
+  T &&Value() && { return std::move(Value()); }
 
   void Reset() {
     if (is_initialized_) {

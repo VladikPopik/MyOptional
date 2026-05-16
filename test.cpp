@@ -19,6 +19,12 @@ struct C {
   }
   ~C() { ++dtor; }
 
+  void Update() const & { ++const_lvalue_call_count; }
+
+  void Update() & { ++lvalue_call_count; }
+
+  void Update() && { ++rvalue_call_count; }
+
   static size_t InstanceCount() {
     return def_ctor + copy_ctor + move_ctor - dtor;
   }
@@ -30,6 +36,9 @@ struct C {
     copy_assign = 0;
     move_assign = 0;
     dtor = 0;
+    lvalue_call_count = 0;
+    rvalue_call_count = 0;
+    const_lvalue_call_count = 0;
   }
 
   inline static size_t def_ctor = 0;
@@ -38,6 +47,10 @@ struct C {
   inline static size_t copy_assign = 0;
   inline static size_t move_assign = 0;
   inline static size_t dtor = 0;
+
+  inline static size_t lvalue_call_count = 0;
+  inline static size_t rvalue_call_count = 0;
+  inline static size_t const_lvalue_call_count = 0;
 };
 
 void TestInitialization() {
@@ -209,6 +222,58 @@ void TestEmplace() {
   assert(*(o->p) == 4);
 }
 
+void TestRefQualifiedMethodOverloading() {
+  {
+    C::Reset();
+    C val = *Optional<C>(C{});
+    assert(C::copy_ctor == 0);
+    assert(C::move_ctor == 2);
+    assert(C::def_ctor == 1);
+    assert(C::copy_assign == 0);
+    assert(C::move_assign == 0);
+  }
+  {
+    C::Reset();
+    C val = Optional<C>(C{}).Value();
+    assert(C::copy_ctor == 0);
+    assert(C::move_ctor == 2);
+    assert(C::def_ctor == 1);
+    assert(C::copy_assign == 0);
+    assert(C::move_assign == 0);
+  }
+  {
+    C::Reset();
+    Optional<C> opt(C{});
+    (*opt).Update();
+    assert(C::lvalue_call_count == 1);
+    assert(C::rvalue_call_count == 0);
+    (*std::move(opt)).Update();
+    assert(C::lvalue_call_count == 1);
+    assert(C::rvalue_call_count == 1);
+  }
+  {
+    C::Reset();
+    const Optional<C> opt(C{});
+    (*opt).Update();
+    assert(C::const_lvalue_call_count == 1);
+  }
+  {
+    C::Reset();
+    Optional<C> opt(C{});
+    opt.Value().Update();
+    assert(C::lvalue_call_count == 1);
+    assert(C::rvalue_call_count == 0);
+    std::move(opt).Value().Update();
+    assert(C::lvalue_call_count == 1);
+  }
+  {
+    C::Reset();
+    const Optional<C> opt(C{});
+    opt.Value().Update();
+    assert(C::const_lvalue_call_count == 1);
+  }
+}
+
 int main() {
   try {
     TestInitialization();
@@ -217,6 +282,7 @@ int main() {
     TestValueAccess();
     TestReset();
     TestEmplace();
+    TestRefQualifiedMethodOverloading();
   } catch (...) {
     assert(false);
   }
